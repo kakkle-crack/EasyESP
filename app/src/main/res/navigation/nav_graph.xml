@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/wifiTerminalFragment">
+
+    <fragment
+        android:id="@+id/wifiTerminalFragment"
+        android:name="com.example.easyesp.WifiTerminalFragment"
+        android:label="WiFi Terminal"
+        tools:layout="@layout/fragment_wifi_terminal">
+        <argument
+            android:name="ipAddress"
+            app:argType="string"
+            app:nullable="true"
+            android:defaultValue="@null" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/navigation_known_devices"
+        android:name="com.example.easyesp.KnownDevicesFragment"
+        android:label="Known Devices"
+        tools:layout="@layout/fragment_known_devices" >
+        <action
+            android:id="@+id/action_KnownDevicesFragment_to_WifiTerminalFragment"
+            app:destination="@id/wifiTerminalFragment" />
+    </fragment>
+
+    <!-- Your other fragments -->
+    <fragment
+        android:id="@+id/nav_bluetooth_settings"
+        android:name="com.example.easyesp.BluetoothSettingsFragment"
+        android:label="Bluetooth Settings"
+        tools:layout="@layout/fragment_bluetooth_settings" />
+
+    <fragment
+        android:id="@+id/nav_sandbox"
+        android:name="com.example.easyesp.SandboxFragment"
+        android:label="Sandbox"
+        tools:layout="@layout/fragment_sandbox" />
+
+    <fragment
+        android:id="@+id/tutorialFragment"
+        android:name="com.example.easyesp.TutorialFragment"
+        android:label="Tutorial"
+        tools:layout="@layout/fragment_tutorial" />
+
+</navigation>

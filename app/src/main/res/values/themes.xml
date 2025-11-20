@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Base application theme. -->
+    <style name="Theme.EasyESP" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <!--
+            Customize your theme here.
+            For example, you can define your primary and secondary colors.
+            <item name="colorPrimary">@color/your_color</item>
+        -->
+    </style>
+
+</resources>

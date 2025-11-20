@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:showIn="navigation_view">
+
+    <group android:checkableBehavior="single">
+        <item
+            android:id="@+id/wifiTerminalFragment"
+            android:title="WiFi Terminal"
+            app:popUpTo="@id/nav_graph"
+            app:popUpToInclusive="true" />
+        <item
+            android:id="@+id/navigation_known_devices"
+            android:title="Known Devices"
+            app:popUpTo="@id/nav_graph"
+            app:popUpToInclusive="true" />
+        <item
+            android:id="@+id/nav_bluetooth_settings"
+            android:title="Bluetooth Settings"
+            app:popUpTo="@id/nav_graph"
+            app:popUpToInclusive="true" />
+        <item
+            android:id="@+id/nav_sandbox"
+            android:title="Sandbox"
+            app:popUpTo="@id/nav_graph"
+            app:popUpToInclusive="true" />
+        <item
+            android:id="@+id/tutorialFragment"
+            android:icon="@android:drawable/ic_menu_help"
+            android:title="Tutorial"
+            app:popUpTo="@id/nav_graph"
+            app:popUpToInclusive="true" />
+    </group>
+</menu>
