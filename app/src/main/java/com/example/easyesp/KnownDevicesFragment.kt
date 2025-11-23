@@ -74,8 +74,8 @@ class KnownDevicesFragment : Fragment() {
                 }
                 Toast.makeText(requireContext(), "Connecting to ${device.deviceName}...", Toast.LENGTH_SHORT).show()
                 // The connectToTcpServer function needs to be public in WifiTerminalFragment or moved to ViewModel
-                // For now, let's navigate to the WiFi fragment and let it handle the connection.
-                // We'll pass the IP address as an argument.
+                // For now, navigate to the WiFi fragment and let it handle the connection.
+                // pass the IP address as an argument.
                 val action = KnownDevicesFragmentDirections.actionKnownDevicesFragmentToWifiTerminalFragment(device.ipAddress)
                 findNavController().navigate(action)
             },
@@ -129,7 +129,7 @@ class KnownDevicesFragment : Fragment() {
             .setNegativeButton("Cancel", null) // Keep a standard cancel button
             .create()
 
-        // Get references to our custom buttons
+        // Get references to custom buttons
         val editButton: Button = dialogView.findViewById(R.id.dialog_button_edit)
         val deleteButton: Button = dialogView.findViewById(R.id.dialog_button_delete)
         val disconnectButton: Button = dialogView.findViewById(R.id.dialog_button_disconnect)
@@ -166,7 +166,7 @@ class KnownDevicesFragment : Fragment() {
             .setTitle("Delete Device")
             .setMessage("Are you sure you want to delete '${device.deviceName}'?")
             .setPositiveButton("Delete") { _, _ ->
-                // *** NEW: Check if we are deleting the connected device ***
+                // Check if deleting the connected device
                 if (connectionViewModel.connectedDeviceIp.value == device.ipAddress) {
                     connectionViewModel.disconnect()
                 }

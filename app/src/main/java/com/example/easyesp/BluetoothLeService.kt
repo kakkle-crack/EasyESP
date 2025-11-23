@@ -1,4 +1,3 @@
-// In C:/Users/kakkl/AndroidStudioProjects/EasyESP/app/src/main/java/com/example/easyesp/BluetoothLeService.kt
 package com.example.easyesp
 
 import android.Manifest
@@ -52,7 +51,7 @@ class BluetoothLeService : Service() {
         const val ACTION_MANAGE_SCAN_STATE = "com.example.easyesp.ACTION_MANAGE_SCAN_STATE"
 
         val SERVICE_UUID: UUID = UUID.fromString("1fc8d4ca-3b3d-42e3-bdf0-1ff2edcf8268")
-        // Your ESP code only needs the RX characteristic for provisioning.
+        // ESP code needs the TX and RX characteristic for provisioning.
         val CHARACTERISTIC_UUID_RX: UUID = UUID.fromString("586eb1c5-597a-4c5a-bfcf-655d4909b7a1")
         val CHARACTERISTIC_UUID_TX: UUID = UUID.fromString("586eb1c5-597a-4c5a-bfcf-655d4909b7a2")
         val CCCD_UUID: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
@@ -79,8 +78,7 @@ class BluetoothLeService : Service() {
                 if (newState == BluetoothProfile.STATE_CONNECTED) {
                     Log.w(TAG, "****** SUCCESSFULLY CONNECTED to ${gatt?.device?.address} ******")
                     bluetoothGatt = gatt
-                    // *** FIX: Discover services immediately upon connection ***
-                    // Don't wait for MTU. For this simple use case, it's more reliable.
+                    // Don't wait for MTU.
                     if (ContextCompat.checkSelfPermission(this@BluetoothLeService, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
                         bluetoothGatt?.discoverServices()
                     }
@@ -99,18 +97,16 @@ class BluetoothLeService : Service() {
             }
         }
 
-        // *** FIX: REMOVED onMtuChanged callback entirely for simplicity and reliability ***
 
         override fun onServicesDiscovered(gatt: BluetoothGatt?, status: Int) {
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 Log.i(TAG, "Services discovered successfully.")
-                // *** FIX: Broadcast that we are fully connected *after* services are discovered ***
                 // This is the true "ready" state.
                 ViewModelHolder.connectionViewModel?.isBleConnected?.postValue(true)
                 enableNotifications(gatt)
             } else {
                 Log.w(TAG, "Service discovery failed with status: $status")
-                disconnect() // If service discovery fails, we can't do anything. Disconnect.
+                disconnect() // If service discovery fails, Disconnect.
             }
         }
         override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, value: ByteArray) {
@@ -123,12 +119,12 @@ class BluetoothLeService : Service() {
     private val leScanCallback: ScanCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
             super.onScanResult(callbackType, result)
-            // *** FIX: Use BLUETOOTH_SCAN permission for scanning, not CONNECT ***
+            // Use BLUETOOTH_SCAN permission for scanning, not CONNECT
             if (ContextCompat.checkSelfPermission(this@BluetoothLeService, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED) {
                 Log.i(TAG, "Found device: ${result.device.name ?: "Unnamed"} - Address: ${result.device.address}")
                 stopBleScan()
                 //bluetoothGatt = result.device.connectGatt(this@BluetoothLeService, false, gattCallback)
-                connectToDevice(result.device) //needed? correct? idk
+                connectToDevice(result.device) //needed
             }
         }
         override fun onScanFailed(errorCode: Int) {
@@ -156,14 +152,14 @@ class BluetoothLeService : Service() {
             return
         }
 
-        // If we are already connected, there's no need to scan. Stop the loop.
+        // If already connected, there's no need to scan. Stop the loop.
         if (bluetoothGatt != null) {
             Log.i(TAG, "Scan check stopped: Already connected to a device.")
             stopBleScan()
             return
         }
 
-        // If we got here, discovery is on and we are not connected. Let's scan.
+        // If here, discovery is on and device not connected. Perform scan.
         if (!isScanning) {
             val deviceNameToScanFor = sharedPreferences.getString(BluetoothSettingsFragment.KEY_DEVICE_NAME, BluetoothSettingsFragment.DEFAULT_DEVICE_NAME)
             Log.i(TAG, "Starting BLE scan for device name: $deviceNameToScanFor")
@@ -228,8 +224,6 @@ class BluetoothLeService : Service() {
         bluetoothGatt = null
     }
 
-    // *** FIX: REMOVED enableNotifications(). It's no longer needed. ***
-
     fun writeCharacteristic(data: String) {
         if (bluetoothGatt == null) {
             Log.e(TAG, "Cannot write, GATT not connected.")
@@ -261,7 +255,6 @@ class BluetoothLeService : Service() {
         LocalBroadcastManager.getInstance(this).sendBroadcast(intent)
     }
 
-    // *** All other functions like onCreate, onStartCommand, etc., remain the same but are not shown for brevity ***
     override fun onCreate() {
         super.onCreate()
         Log.d(TAG, "BluetoothLeService created.")

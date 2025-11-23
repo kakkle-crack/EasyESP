@@ -22,7 +22,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // **THE CRITICAL CHANGE IS HERE:** Load the new activity_main.xml
+        // Load the new activity_main.xml
         setContentView(R.layout.activity_main)
 
         // Find the new UI components from activity_main.xml
@@ -40,7 +40,7 @@ class MainActivity : AppCompatActivity() {
         // Define which menu items are top-level destinations (show hamburger icon)
         appBarConfiguration = AppBarConfiguration(
             setOf(
-                R.id.wifiTerminalFragment, R.id.navigation_known_devices, // <-- ADD THIS
+                R.id.wifiTerminalFragment, R.id.navigation_known_devices,
                 R.id.nav_bluetooth_settings, R.id.nav_sandbox
             ), drawerLayout
         )

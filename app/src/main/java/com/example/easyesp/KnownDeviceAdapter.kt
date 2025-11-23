@@ -45,7 +45,7 @@ class KnownDeviceAdapter(
         val layout = holder.itemView.findViewById<View>(R.id.known_device_layout)
 
         if (device.ipAddress == connectedIp) {
-            // Set background to yellow highlight. Make sure yellow_highlight is in your colors.xml
+            // Set background to yellow highlight. had to add yellow_highlight in colors.xml
             layout.setBackgroundColor(
                 ContextCompat.getColor(holder.itemView.context, R.color.yellow_highlight)
             )

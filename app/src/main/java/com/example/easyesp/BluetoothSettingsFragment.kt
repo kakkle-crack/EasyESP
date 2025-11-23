@@ -70,10 +70,9 @@ class BluetoothSettingsFragment : Fragment() {
                 // First, save the state as before
                 saveDiscoveryState(isChecked)
 
-                // *** THE FIX IS HERE ***
                 // Now, create an explicit Intent to command the service.
                 val intent = Intent(requireContext(), BluetoothLeService::class.java).apply {
-                    // Set the action we want the service to perform.
+                    // Set the action for the service to perform.
                     action = BluetoothLeService.ACTION_MANAGE_SCAN_STATE
                 }
                 // Start the service with this command. If the service is running,
@@ -99,7 +98,7 @@ class BluetoothSettingsFragment : Fragment() {
         editor.putBoolean(KEY_DISCOVERY_ENABLED, isEnabled)
         editor.apply()
 
-        // Here we can also add logic to start/stop the BLE service scan if needed,
+        // Here is logic to start/stop the BLE service scan if needed,
         // but for now, the service will just read this value when it's told to scan.
     }
 

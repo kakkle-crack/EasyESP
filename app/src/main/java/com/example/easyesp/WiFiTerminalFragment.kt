@@ -45,7 +45,7 @@ class WifiTerminalFragment : Fragment() {
     // --- ViewModel ---
     private val connectionViewModel: ConnectionViewModel by activityViewModels()
 
-    // --- NEW: Navigation Arguments and Filename for saving ---
+    // Navigation Arguments and Filename for saving
     private val args: WifiTerminalFragmentArgs by navArgs()
     private val FILENAME = "known_devices.dat"
 
@@ -77,7 +77,7 @@ class WifiTerminalFragment : Fragment() {
         passwordInput = view.findViewById(R.id.passText2)
         connectButton = view.findViewById(R.id.connectButton)
 
-        // --- ViewModel Observers (Your existing code is correct) ---
+        // --- ViewModel Observers --
         connectionViewModel.connectionStatusText.observe(viewLifecycleOwner, Observer { status ->
             connectionStatusText.text = status
         })
@@ -107,7 +107,7 @@ class WifiTerminalFragment : Fragment() {
         serialMonitorTextView.text = connectionViewModel.serialLog.value
         serialMonitorScrollView.post { serialMonitorScrollView.fullScroll(ScrollView.FOCUS_DOWN) }
 
-        // --- Initial Setup Logic (Your existing code is correct) ---
+        // --- Initial Setup Logic ---
         val wifiManager = requireContext().applicationContext.getSystemService(Context.WIFI_SERVICE) as android.net.wifi.WifiManager
         val wifiInfo = wifiManager.connectionInfo
         if (wifiInfo != null && wifiInfo.networkId != -1) {
@@ -132,7 +132,7 @@ class WifiTerminalFragment : Fragment() {
             }
         }
 
-        // *** NEW: Check for incoming IP Address to auto-connect ***
+        // Check for incoming IP Address to auto-connect
         args.ipAddress?.let { ip ->
             if (connectionViewModel.isTcpConnected.value != true) {
                 Log.d(TAG, "Received IP to auto-connect: $ip")
@@ -172,7 +172,7 @@ class WifiTerminalFragment : Fragment() {
                     Toast.makeText(requireContext(), "Connected to ESP32 via WiFi!", Toast.LENGTH_SHORT).show()
                 }
 
-                // *** NEW: Save the successfully connected device ***
+                // Save the successfully connected device
                 // Defaulting the name, but this could be improved later (e.g., asking the user)
                 val deviceName = "ESP32-${host.hostAddress.takeLast(3)}"
                 val newDevice = KnownDevice(deviceName = deviceName, ipAddress = host.hostAddress)
@@ -189,7 +189,7 @@ class WifiTerminalFragment : Fragment() {
         }
     }
 
-    // *** NEW: Helper function to load devices for checking duplicates ***
+    // Helper function to load devices for checking duplicates
     private fun loadDevices(): List<KnownDevice> {
         return try {
             if (requireContext().fileList().contains(FILENAME)) {
@@ -207,7 +207,7 @@ class WifiTerminalFragment : Fragment() {
         }
     }
 
-    // *** NEW: Helper function to save the new device to the file ***
+    // Helper function to save the new device to the file
     private fun saveNewDevice(newDevice: KnownDevice) {
         val knownDevices = loadDevices().toMutableList()
         // Prevent duplicates based on IP address
@@ -231,7 +231,7 @@ class WifiTerminalFragment : Fragment() {
 
     //
     // --- NO OTHER CHANGES NEEDED BELOW THIS LINE ---
-    // The rest of your WifiTerminalFragment file (onResume, onPause, listeners, etc.) is correct.
+    // The rest of WifiTerminalFragment file (onResume, onPause, listeners, etc.) is fine as is
     //
 
     override fun onResume() {
@@ -262,7 +262,7 @@ class WifiTerminalFragment : Fragment() {
     private fun appendToSerialMonitor(message: String) {
         if (isAdded) {
             val currentLog = connectionViewModel.serialLog.value ?: ""
-            // The SandboxFragment's observer will now be triggered by this change.
+            // The SandboxFragment's observer will now be triggered by this.
             connectionViewModel.serialLog.value = currentLog + "$message\n"
         }
     }
@@ -313,7 +313,7 @@ class WifiTerminalFragment : Fragment() {
         // This function does not need changes, it already calls other functions that use the ViewModel.
         discoveryListener = object : NsdManager.DiscoveryListener {
             override fun onDiscoveryStarted(regType: String) {
-                //Wrap UI calls in runOnUiThread ***
+                //Wrap UI calls in runOnUiThread
                 activity?.runOnUiThread {
                     appendToSerialMonitor("System: NSD discovery started.")
                 }
@@ -324,7 +324,7 @@ class WifiTerminalFragment : Fragment() {
                     return
                 }
                 if (service.serviceType.contains(SERVICE_TYPE.trim('.'))) {
-                    //Wrap UI calls in runOnUiThread ***
+                    //Wrap UI calls in runOnUiThread
                     activity?.runOnUiThread {
                         appendToSerialMonitor("System: Service matches. Resolving...")
                     }
@@ -340,7 +340,7 @@ class WifiTerminalFragment : Fragment() {
             }
             override fun onDiscoveryStopped(serviceType: String) { Log.i(TAG, "Discovery stopped: $serviceType") }
             override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) {
-                // *** FIX IS HERE: Wrap UI calls in runOnUiThread ***
+                // Wrap UI calls in runOnUiThread
                 activity?.runOnUiThread {
                     appendToSerialMonitor("System: ERROR - Discovery failed. Code: $errorCode")
                 }
@@ -353,14 +353,14 @@ class WifiTerminalFragment : Fragment() {
         resolveListener = object : NsdManager.ResolveListener {
             override fun onResolveFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {
                 isResolving = false
-                // Wrap UI calls in runOnUiThread ***
+                // Wrap UI calls in runOnUiThread
                 activity?.runOnUiThread {
                     appendToSerialMonitor("System: ERROR - Failed to resolve service. Code: $errorCode")
                 }
             }
             override fun onServiceResolved(serviceInfo: NsdServiceInfo) {
                 isResolving = false
-                //Wrap UI calls in runOnUiThread ***
+                //Wrap UI calls in runOnUiThread
                 activity?.runOnUiThread {
                     appendToSerialMonitor("System: Service resolved! IP: ${serviceInfo.host}, Port: ${serviceInfo.port}")
                 }
@@ -375,7 +375,6 @@ class WifiTerminalFragment : Fragment() {
 // It will "suspend" the coroutine from connectToTcpServer while it waits for messages.
     private suspend fun listenForTcpMessages() {
         val currentReader = reader ?: run {
-            // *** ADD THIS DEBUG LOG ***
             Log.e("DEBUG_TRACE", "[4] listenForTcpMessages: FAILED. Reader is NULL at start.")
             return
         }
@@ -404,7 +403,7 @@ class WifiTerminalFragment : Fragment() {
         Log.d("DEBUG_TRACE", "[6] listenForTcpMessages: Loop has finished.")
     }
 
-    // You also need a disconnect function that runs on the main thread
+    // disconnect function that runs on the main thread
     private fun disconnectTcp() {
         isResolving = false // Reset the flag
         if (connectionViewModel.isTcpConnected.value == false) return

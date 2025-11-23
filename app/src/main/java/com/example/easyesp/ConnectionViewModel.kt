@@ -8,9 +8,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.PrintWriter
-import java.net.Socket // <-- Import Socket
+import java.net.Socket
 
-// This class will hold the state of our connection and logs
+// This class will hold the state of connection and logs
 class ConnectionViewModel : ViewModel() {
 
     // --- EXISTING PROPERTIES ---
@@ -46,7 +46,7 @@ class ConnectionViewModel : ViewModel() {
         }
     }
 
-    // --- NEW FUNCTION TO ALLOW DISCONNECTING ---
+    // --- FUNCTION TO ALLOW DISCONNECTING ---
     /** Disconnects from the current TCP socket if one is active. */
     fun disconnect() {
         viewModelScope.launch(Dispatchers.IO) {

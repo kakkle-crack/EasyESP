@@ -2,13 +2,14 @@ package com.example.easyesp
 
 import java.io.Serializable
 
-// Enum to define the types of controls we can have.
+// Enum to define the types of controls.
 // This prevents errors from using simple strings.
 enum class ControlType {
     BUTTON,
     SWITCH,
-    SLIDER, // We decided a Slider is a better name for the "Value" type
-    INTERACTION //new
+    SLIDER, // Slider is a better name for the "Value" type,
+    //       but I retained the "V" since I had S for switch
+    INTERACTION //new type
 }
 
 /**

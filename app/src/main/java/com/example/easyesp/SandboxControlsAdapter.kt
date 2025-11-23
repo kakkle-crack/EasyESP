@@ -25,7 +25,7 @@ class SandboxControlsAdapter(
         val pinTextView: TextView = itemView.findViewById(R.id.control_command_text)
     }
 
-    // --- ADD A NEW VIEWHOLDER FOR INTERACTION ---
+    // --- ADD VIEWHOLDER FOR INTERACTION ---
     class InteractionViewHolder(itemView: View) : ControlViewHolder(itemView) {
         val commandTextView: TextView = itemView.findViewById(R.id.control_command_text)
         val actionButton: Button = itemView.findViewById(R.id.control_action_button)
