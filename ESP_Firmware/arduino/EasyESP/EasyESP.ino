@@ -20,8 +20,8 @@ char wifi_ssid[64] = {0};
 char wifi_pass[64] = {0};
 volatile bool shouldConnectToWifi = false;
 
-// *** NEW STATE FLAGS FOR ROBUSTNESS ***
-bool isProvisioned = false;      // Tracks if we have successfully connected to WiFi
+// STATE FLAGS FOR ROBUSTNESS 
+bool isProvisioned = false;      // Tracks if successfully connected to WiFi
 bool is_advertising = false;     // Manually track advertising state
 
 #define SERVICE_UUID           "1fc8d4ca-3b3d-42e3-bdf0-1ff2edcf8268"
@@ -29,10 +29,6 @@ bool is_advertising = false;     // Manually track advertising state
 #define CHARACTERISTIC_UUID_TX "586eb1c5-597a-4c5a-bfcf-655d4909b7a2" // ESP -> Phone
 
 BLECharacteristic* pTxCharacteristic = NULL; // Global pointer
-
-//#define LEDC_CHANNEL_0 0 // We'll use channel 0 for our first slider
-//#define LEDC_TIMER_8_BIT 8 // 8-bit resolution (0-255)
-//#define LEDC_BASE_FREQ 5000 // 5kHz frequency
 
 // --- BLE Callbacks ---
 class MyServerCallbacks: public BLEServerCallbacks {
@@ -115,14 +111,14 @@ void setup() {
     );
     pTxCharacteristic->addDescriptor(new BLE2902()); // Standard descriptor for notifications   
     pService->start();
-    start_advertising(); // Use our new helper function
+    start_advertising(); // Use new helper function
 }
 
 void loop() {
     // --- STATE 1: PROVISIONING ATTEMPT ---
-    // If a BLE client has sent us WiFi credentials, this is our highest priority.
+    // If a BLE client has sent WiFi credentials, this is highest priority.
     if (shouldConnectToWifi) {
-        shouldConnectToWifi = false; // We've acknowledged the request.
+        shouldConnectToWifi = false; // acknowledged the request.
         //disconnect previous session
         Serial.println("Framework: Disconnecting previous WiFi configuration before new attempt.");
         WiFi.disconnect(true);
@@ -147,7 +143,7 @@ void loop() {
                 Serial.println(">>> Sent 'STATUS:OK' to phone.");
             }
 
-            // Now, gracefully shut down BLE and start the network services
+            // shut down BLE and start the network services
             delay(100); // give a moment for the BLE notification to send
             stop_advertising();
             if (deviceConnected) { pServer->disconnect(pServer->getConnId()); }
@@ -168,13 +164,13 @@ void loop() {
                 pTxCharacteristic->notify();
                 Serial.println(">>> Sent 'STATUS:FAIL' to phone.");
             }
-            // On failure, we do nothing else. The phone is still connected via BLE
+            // On failure, do nothing else. The phone is still connected via BLE
             // and the auto-advertising logic below will take over if it disconnects.
         }
     }
 
     // --- STATE 2: NORMAL OPERATION (TCP COMMANDS) ---
-    // If we are already connected to WiFi, our only job is to handle the TCP client.
+    // If already connected to WiFi, only job is to handle the TCP client.
     else if (WiFi.status() == WL_CONNECTED) {
         if (!client.connected()) {
             client = tcpServer.available();
@@ -203,7 +199,7 @@ void loop() {
                             Serial.printf("Framework: Parsed as Type=%s, Pin=%d, Value=%d\n", type, pin, value);
                             client.printf("ACK:%s,%d,%d\n", type, pin, value);
 
-                            // *** CALL THE USER'S HANDLER FUNCTION ***
+                            // CALL THE USER'S HANDLER FUNCTION. THIS IS THE HEART OF SANDBOX.
                             handle_user_action(type, pin, value);
                         }
                     } else {
@@ -211,7 +207,7 @@ void loop() {
                         // It must be a custom INTERACTION command.
                         client.print("ACK: " + line + "\n");
                         
-                        // *** CALL THE USER'S INTERACTION HANDLER ***
+                        // CALL THE USER'S INTERACTION HANDLER
                         handle_interaction_command(line);
                     }
                 }
