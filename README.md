@@ -68,3 +68,12 @@ Serial.printf("Action: Setting NeoPixel brightness to %d.\n", value);
         FastLED.show();
     }
 }
+<img width="1080" height="2400" alt="main" src="https://github.com/user-attachments/assets/060d2aeb-0785-4cd3-bc49-021bd7b56993" />
+<img width="1080" height="2400" alt="connected" src="https://github.com/user-attachments/assets/850586c5-5f87-4e41-9c22-c803e3e8f9d7" />
+<img width="1080" height="2400" alt="menu" src="https://github.com/user-attachments/assets/1879f9d8-ae35-48f4-945b-69b51dc2f8d6" />
+<img width="1080" height="2400" alt="sandbox" src="https://github.com/user-attachments/assets/9707674b-b2f0-42ff-a95b-a8242101e786" />
+<img width="1080" height="2400" alt="addcontrol" src="https://github.com/user-attachments/assets/0d7f77ed-daab-4a88-b0ce-f5c82c1efa70" />
+<img width="1080" height="2400" alt="adddevice" src="https://github.com/user-attachments/assets/6845a5e0-d2c9-45de-9e46-dcf3c0f94fa0" />
+<img width="1080" height="2400" alt="deviceoptions" src="https://github.com/user-attachments/assets/d0760e7b-385e-4aa6-9182-969b8c7300be" />
+
+
