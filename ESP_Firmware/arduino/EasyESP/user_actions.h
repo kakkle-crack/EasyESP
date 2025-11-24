@@ -22,41 +22,57 @@ void user_setup() {
 }
 
 // STEP 4: CREATE YOUR ACTION HANDLER
-// This function is called by the main loop() whenever a valid command is received.
 void handle_user_action(char* type, int pin, int value) {
     Serial.printf("User action handler received: Type=%s, Pin=%d, Value=%d\n", type, pin, value);
 
     // --- YOUR CUSTOM LOGIC GOES HERE ---
 
-    // Example Below: Make the onboard NeoPixel light up for a button press on pin 1
-    if (strcmp(type, "B") == 0 && pin == NEOPIXEL_PIN) {
-        Serial.println("Action: Triggering NeoPixel.");
-        leds[0] = CRGB::Red; // Turn the LED Red
-        FastLED.show();
-        delay(value);       // Keep it on for the duration specified by the app
-        leds[0] = CRGB::Black; // Turn it off
-        FastLED.show();
-    } else if (strcmp(type, "S") == 0 && pin == NEOPIXEL_PIN) {
-        Serial.printf("Action: Triggering NeoPixel (Switch) to value %d.\n", value);
-        if (value == 1) {
-            // This is the ON state
-            leds[0] = CRGB::Red; // Turn the LED Red
+    // **PRIORITY 1: Handle specific, custom pin logic first.**
+    // Example: If the command is for the NeoPixel, do something special with it.
+    if (pin == NEOPIXEL_PIN) {
+        Serial.println("Action is for the NeoPixel pin. Handling with FastLED.");
+        if (strcmp(type, "S") == 0) { // Switch
+            leds[0] = (value == 1) ? CRGB::Red : CRGB::Black;
             FastLED.show();
-        } else {
-            // This is the OFF state (value == 0)
-            leds[0] = CRGB::Black; // Turn it off
+        } else if (strcmp(type, "V") == 0) { // Slider
+            leds[0] = CRGB::White;
+            leds[0].nscale8(value);
+            FastLED.show();
+        } else if (strcmp(type, "B") == 0) { // Button
+            leds[0] = CRGB::Red;
+            FastLED.show();
+            delay(value);
+            leds[0] = CRGB::Black;
             FastLED.show();
         }
-    } else if (strcmp(type, "V") == 0 && pin == NEOPIXEL_PIN) {
-        // Here, the 'value' (0-255) from the app's slider will control the brightness.
-        Serial.printf("Action: Setting NeoPixel brightness to %d.\n", value);
-        
-        // Set the color (e.g., White) and then scale its brightness using the slider value.
-        // The nscale8_video function is a fast way to apply a brightness level (0-255) to a color.
-        leds[0] = CRGB::White; // Start with a base color
-        leds[0].nscale8(value); // Scale its brightness by the slider's value
-        
-        FastLED.show();
+        return; // IMPORTANT: Exit after handling the special pin case.
+    }
+
+    // **PRIORITY 2: Handle generic, default pin actions.**
+    // If the code reaches here, it means the pin was NOT a special use pin.
+    // Now, perform the fundamental digital/analog actions.
+    if (strcmp(type, "B") == 0) {
+        // Default Button: Momentary HIGH signal
+        Serial.printf("Action: Generic Button on pin %d\n", pin);
+        pinMode(pin, OUTPUT);
+        digitalWrite(pin, HIGH);
+        delay(value);
+        digitalWrite(pin, LOW);
+    }
+    else if (strcmp(type, "S") == 0) {
+        // Default Switch: Set pin HIGH or LOW
+        Serial.printf("Action: Generic Switch on pin %d to value %d\n", pin, value);
+        pinMode(pin, OUTPUT);
+        digitalWrite(pin, (value == 1) ? HIGH : LOW);
+    }
+    else if (strcmp(type, "V") == 0) {
+        // Default Slider: Write an analog value (PWM)
+        // NOTE: ESP32's analogWrite is actually ledc. We need to set it up.
+        Serial.printf("Action: Generic Slider on pin %d to value %d\n", pin, value);
+        // ledc is better, but analogWrite is simpler
+        // For a real project, use ledcSetup/ledcAttachPin/ledcWrite.
+        pinMode(pin, OUTPUT);
+        analogWrite(pin, value); 
     }
 }
 
