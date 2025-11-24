@@ -77,7 +77,22 @@ class SandboxFragment : Fragment() {
         connectionViewModel.latestTcpMessage.observe(viewLifecycleOwner, Observer { message ->
             // We can add a check if we want to be specific, e.g., if(message.startsWith("ACK:"))
             if (message != null) {
-                appendToSandboxMonitor("ESP32 -> App (WiFi): $message")
+                // Check if the message is a custom log from the ESP32
+                if (message.startsWith("LOG:")) {
+                    // It's a log message
+                    val logMessage = message.substringAfter("LOG:").trim()
+                    // Prepend with "ESP32:" to show it came FROM the device
+                    appendToSandboxMonitor("ESP32: $logMessage")
+
+                } else if (message.startsWith("ACK:")) {
+                    // It's a standard acknowledgement
+                    val ackMessage = message.substringAfter("ACK:").trim()
+                    appendToSandboxMonitor("ACK from ESP32: $ackMessage")
+
+                } else {
+                    // For any other message that doesn't fit a known format
+                    appendToSandboxMonitor("ESP32 (RAW): $message")
+                }
             }
         })
     }

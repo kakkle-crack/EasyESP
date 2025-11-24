@@ -2,8 +2,12 @@
 // --- USER IMPLEMENTATION - ADD YOUR CUSTOM CODE AND LIBRARIES --- //
 // ---------------------------------------------------------------- //
 
+#include <WiFi.h> //Required for Client declaration
+extern WiFiClient client; //required for messages
+
 // STEP 1: ADD LIBRARIES HERE
 #include <FastLED.h>
+#include <ESPping.h>
 
 // STEP 2: DEFINE YOUR PINS AND GLOBAL VARIABLES HERE
 #define NEOPIXEL_PIN 48 // The GPIO pin for WS2812 LED (adjust if needed)
@@ -23,8 +27,8 @@ void handle_user_action(char* type, int pin, int value) {
     Serial.printf("User action handler received: Type=%s, Pin=%d, Value=%d\n", type, pin, value);
 
     // --- YOUR CUSTOM LOGIC GOES HERE ---
-    // Example Below: Make the onboard NeoPixel light up for a button press on pin 1
 
+    // Example Below: Make the onboard NeoPixel light up for a button press on pin 1
     if (strcmp(type, "B") == 0 && pin == NEOPIXEL_PIN) {
         Serial.println("Action: Triggering NeoPixel.");
         leds[0] = CRGB::Red; // Turn the LED Red
@@ -62,7 +66,29 @@ void handle_interaction_command(String line) {
     Serial.printf("User interaction handler received: %s\n", line.c_str());
 
     // --- YOUR CUSTOM LOGIC GOES HERE ---
-    // Example: Handle a "LIGHTS_ON" and "LIGHTS_OFF" command
+        //Example 1: Pinging a website 
+        //using command format: "PING:google.com" as text
+    if (line.startsWith("PING:")) {
+        String host = line.substring(5); // Extract the hostname
+        
+        // Let the app know we're starting the process
+        client.printf("LOG:Pinging host: %s...\n", host.c_str());
+
+        bool success = Ping.ping(host.c_str(), 3); // Ping 3 times
+
+        if (!success) {
+            Serial.printf("Ping failed to host %s\n", host.c_str());
+            // Send the failure message back to the app's monitor
+            client.printf("LOG:Ping failed. Host may be unreachable.\n");
+        } else {
+            float avg_time = Ping.averageTime();
+            Serial.printf("Ping success, avg time: %.2fms\n", avg_time);
+            // Send the successful result back to the app's monitor!
+            client.printf("LOG:Ping success! Average time: %.2f ms\n", avg_time);
+        }
+    }
+
+    // Example 2: Handle a "LIGHTS_ON" and "LIGHTS_OFF" command
     
     if (line == "TESTLED_ON") {
         Serial.println("Action: Turning NeoPixel ON.");
