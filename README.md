@@ -68,3 +68,12 @@ Serial.printf("Action: Setting NeoPixel brightness to %d.\n", value);
         FastLED.show();
     }
 }
+
+
+<img width="1080" height="2400" alt="517973912-5e794905-0c78-4449-b25f-e9be605f984a" src="https://github.com/user-attachments/assets/52518b46-47a3-44bf-85d7-e497b0e4e5e7" />
+<img width="1080" height="2400" alt="517973911-bededc3e-5e11-459b-9a39-e4eced72cb4a" src="https://github.com/user-attachments/assets/99f7b48f-47cd-40b3-89c7-efbdd62d6963" />
+<img width="1080" height="2400" alt="517973910-effb530e-a3ca-45bd-8f29-5251f8c89bb9" src="https://github.com/user-attachments/assets/cc15c568-198b-44da-9a8b-07504f7a9af4" />
+<img width="1080" height="2400" alt="517973909-f8897729-0856-43d8-81d2-6f41ac03e150" src="https://github.com/user-attachments/assets/b5f07e94-da79-43e8-89ae-c66f709d7ed5" />
+<img width="1080" height="2400" alt="517973908-ce4df0fa-5f50-4b00-a10b-da5e3ff60f67" src="https://github.com/user-attachments/assets/e90308d4-174f-40be-8b80-c7df4c49454c" />
+<img width="1080" height="2400" alt="517973906-18353afe-95d4-494f-8bc9-65b7a032f2a4" src="https://github.com/user-attachments/assets/4d9f8f31-97c7-4c0b-bea2-42a686327775" />
+<img width="1080" height="2400" alt="517973913-8208d38a-4ba4-41a1-a729-e1baefbe8257" src="https://github.com/user-attachments/assets/a49cc932-7820-4493-aa35-dc464acdee67" />
