@@ -30,6 +30,7 @@ You will need to set up both the Android application and the ESP32 firmware.
 --Arduino IDE or PlatformIO installed.
 --ESP32 board support installed in your IDE.
 --The FastLED library installed. You can install it via the Arduino Library Manager (Sketch > Include Library > Manage Libraries...).
+--ESPping library
 
 Flashing the Sketch:
 1. Open the EasyESP.ino file in the Arduino IDE. The IDE should automatically open the user_actions.h file in another tab.
