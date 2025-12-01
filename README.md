@@ -4,7 +4,7 @@ EasyESP: Android & ESP32 IoT Framework
 It consists of a native Android application and a flexible ESP32 firmware template, allowing developers
 to get their IoT projects connected and interactive in minutes. The system uses Bluetooth Low Energy
 (BLE) for initial setup and then seamlessly transitions to Wi-Fi (TCP) for real-time control, 
-providing a robust and user-friendly experience.
+providing a relatively user-friendly experience.
 
 Features
 --Seamless WiFi Provisioning: Use the Android app to scan for ESP32 devices and send WiFi credentials over BLE. No hardcoding credentials in your sketch!
