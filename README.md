@@ -16,9 +16,9 @@ providing a relatively user-friendly experience.
 <b> How It Works </b>
 
 The workflow is designed to be simple and intuitive:
-- 1.Provision: The Android app discovers the ESP32 via BLE. The user enters WiFi credentials, which are sent securely to the device.
-- 2.Connect: The ESP32 disconnects from BLE, connects to the specified WiFi network, and starts a TCP server.
-- 3.Control: The Android app connects to the ESP32 via its local IP address over TCP. Users can then interact with the device in real-time through the Sandbox interface, sending commands to control hardware.
+1. Provision: The Android app discovers the ESP32 via BLE. The user enters WiFi credentials, which are sent securely to the device.
+2. Connect: The ESP32 disconnects from BLE, connects to the specified WiFi network, and starts a TCP server.
+3. Control: The Android app connects to the ESP32 via its local IP address over TCP. Users can then interact with the device in real-time through the Sandbox interface, sending commands to control hardware.
 
 <b> Getting Started </b>
 
