@@ -1,58 +1,88 @@
 package com.example.easyesp
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.widget.Toolbar
-import androidx.drawerlayout.widget.DrawerLayout
+import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.AppBarConfiguration
 import androidx.navigation.ui.navigateUp
 import androidx.navigation.ui.setupActionBarWithNavController
 import androidx.navigation.ui.setupWithNavController
-import com.google.android.material.navigation.NavigationView
-import androidx.activity.viewModels
+import com.example.easyesp.databinding.ActivityMainBinding
+
+/**
+ * MainActivity serves as the entry point of the application and manages the navigation drawer.
+ * Migrated to ViewBinding and handles runtime permissions for Bluetooth.
+ */
 class MainActivity : AppCompatActivity() {
 
     private lateinit var appBarConfiguration: AppBarConfiguration
     private lateinit var navController: NavController
+    private lateinit var binding: ActivityMainBinding
 
     private val connectionViewModel: ConnectionViewModel by viewModels()
 
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val scanGranted = permissions[Manifest.permission.BLUETOOTH_SCAN] ?: false
+        val connectGranted = permissions[Manifest.permission.BLUETOOTH_CONNECT] ?: false
+        
+        if (scanGranted && connectGranted) {
+            Toast.makeText(this, "Bluetooth permissions granted.", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(this, "Scanning and Connecting require permissions.", Toast.LENGTH_LONG).show()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Load the new activity_main.xml
-        setContentView(R.layout.activity_main)
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
-        // Find the new UI components from activity_main.xml
-        val toolbar: Toolbar = findViewById(R.id.toolbar)
-        setSupportActionBar(toolbar)
+        setSupportActionBar(binding.toolbar)
 
-        val drawerLayout: DrawerLayout = findViewById(R.id.drawer_layout)
-        val navView: NavigationView = findViewById(R.id.nav_view)
-
-        // Get the NavController from the NavHostFragment
         val navHostFragment = supportFragmentManager
             .findFragmentById(R.id.nav_host_fragment) as NavHostFragment
         navController = navHostFragment.navController
 
-        // Define which menu items are top-level destinations (show hamburger icon)
         appBarConfiguration = AppBarConfiguration(
             setOf(
                 R.id.wifiTerminalFragment, R.id.navigation_known_devices,
                 R.id.nav_bluetooth_settings, R.id.nav_sandbox
-            ), drawerLayout
+            ), binding.drawerLayout
         )
 
-        // Connect the toolbar (ActionBar) to the NavController
         setupActionBarWithNavController(navController, appBarConfiguration)
-        // Connect the navigation drawer to the NavController
-        navView.setupWithNavController(navController)
+        binding.navView.setupWithNavController(navController)
+        
         ViewModelHolder.connectionViewModel = this.connectionViewModel
+
+        checkAndRequestPermissions()
     }
 
-    // This function handles the "Up" button (back arrow) in the toolbar
+    private fun checkAndRequestPermissions() {
+        val permissions = arrayOf(
+            Manifest.permission.BLUETOOTH_SCAN,
+            Manifest.permission.BLUETOOTH_CONNECT,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        )
+
+        val missingPermissions = permissions.filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }
+
+        if (missingPermissions.isNotEmpty()) {
+            requestPermissionLauncher.launch(missingPermissions.toTypedArray())
+        }
+    }
+
     override fun onSupportNavigateUp(): Boolean {
         return navController.navigateUp(appBarConfiguration) || super.onSupportNavigateUp()
     }

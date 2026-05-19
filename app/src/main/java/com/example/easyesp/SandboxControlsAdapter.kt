@@ -9,29 +9,29 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.switchmaterial.SwitchMaterial
 
+/**
+ * Adapter for custom sandbox controls (Button, Switch, Slider, Interaction).
+ * Sends formatted commands (e.g., "B,4,250") to the ESP32.
+ */
 class SandboxControlsAdapter(
     private var controls: List<SandboxControl>,
     private val onControlInteraction: (control: SandboxControl, action: String) -> Unit,
     private val onControlDelete: (control: SandboxControl) -> Unit
 ) : RecyclerView.Adapter<SandboxControlsAdapter.ControlViewHolder>() {
 
-    // Base ViewHolder is now simpler
     open class ControlViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val nameTextView: TextView = itemView.findViewById(R.id.control_name)
     }
 
-    // ViewHolder for pin-based controls
     open class PinControlViewHolder(itemView: View) : ControlViewHolder(itemView) {
         val pinTextView: TextView = itemView.findViewById(R.id.control_command_text)
     }
 
-    // --- ADD VIEWHOLDER FOR INTERACTION ---
     class InteractionViewHolder(itemView: View) : ControlViewHolder(itemView) {
         val commandTextView: TextView = itemView.findViewById(R.id.control_command_text)
         val actionButton: Button = itemView.findViewById(R.id.control_action_button)
     }
 
-    // Update existing ViewHolders to inherit from PinControlViewHolder
     class ButtonViewHolder(itemView: View) : PinControlViewHolder(itemView) {
         val actionButton: Button = itemView.findViewById(R.id.control_action_button)
     }
@@ -60,7 +60,6 @@ class SandboxControlsAdapter(
             R.layout.item_control_button -> ButtonViewHolder(view)
             R.layout.item_control_switch -> SwitchViewHolder(view)
             R.layout.item_control_slider -> SliderViewHolder(view)
-            // --- ADD THE NEW TYPE ---
             R.layout.item_control_interaction -> InteractionViewHolder(view)
             else -> throw IllegalArgumentException("Invalid view type")
         }
@@ -76,18 +75,14 @@ class SandboxControlsAdapter(
         }
 
         when (holder) {
-            // --- HANDLE THE VIEWHOLDER ---
             is InteractionViewHolder -> {
                 holder.commandTextView.text = "Cmd: ${control.command}"
                 holder.actionButton.setOnClickListener {
-                    // For Interaction, the action string IS the command itself.
                     onControlInteraction(control, control.command ?: "")
                 }
             }
-
             is ButtonViewHolder -> {
                 holder.pinTextView.text = "Pin ${control.pin}"
-                // Make the button text more descriptive
                 holder.actionButton.text = "Run (${control.value}ms)"
                 holder.actionButton.setOnClickListener {
                     onControlInteraction(control, "B,${control.pin},${control.value}")
@@ -95,7 +90,6 @@ class SandboxControlsAdapter(
             }
             is SwitchViewHolder -> {
                 holder.pinTextView.text = "Pin ${control.pin}"
-                // Listener needs to be set before isChecked to avoid premature trigger
                 holder.actionSwitch.setOnCheckedChangeListener(null)
                 holder.actionSwitch.isChecked = control.value == 1
                 holder.actionSwitch.setOnCheckedChangeListener { _, isChecked ->
@@ -106,7 +100,6 @@ class SandboxControlsAdapter(
             is SliderViewHolder -> {
                 holder.pinTextView.text = "Pin ${control.pin}"
                 holder.actionSlider.max = 255
-                // Safe call for nullable value, default to 0
                 holder.actionSlider.progress = control.value ?: 0
                 holder.sliderValueTextView.text = control.value.toString()
 
@@ -119,7 +112,6 @@ class SandboxControlsAdapter(
                     }
                     override fun onStartTrackingTouch(seekBar: SeekBar?) {}
                     override fun onStopTrackingTouch(seekBar: SeekBar?) {
-                        // Safe calls for nullable pin and value
                         onControlInteraction(control, "V,${control.pin ?: 0},${control.value ?: 0}")
                     }
                 })

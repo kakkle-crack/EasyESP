@@ -2,14 +2,22 @@
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/linearLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/white"
-    android:gravity="center"
-    android:textAlignment="center"
     tools:context=".WifiTerminalFragment">
 
+    <TextView
+        android:id="@+id/mainTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:text="Easy ESP"
+        android:textColor="?attr/colorOnSurface"
+        android:textSize="34sp"
+        android:textStyle="bold"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
 
     <TextView
         android:id="@+id/connection_status_text"
@@ -17,131 +25,117 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
         android:text="Status: Disconnected"
-        android:textAppearance="@style/TextAppearance.AppCompat.Large"
-        android:textColor="@color/black"
+        android:textAppearance="?attr/textAppearanceTitleMedium"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.497"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/mainTitle" />
 
     <TextView
-        android:id="@+id/data_received_text"
-        android:layout_width="338dp"
-        android:layout_height="77dp"
-        android:layout_marginTop="8dp"
-        android:text="Received Data: ---"
-        android:textAlignment="center"
-        android:textAppearance="@style/TextAppearance.AppCompat.Small"
-        android:textColor="@color/black"
+        android:id="@+id/network_Textview"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:text="Network Details"
+        android:textAppearance="?attr/textAppearanceTitleLarge"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.498"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/connection_status_text" />
 
-    <TextView
-        android:id="@+id/mainTitle"
-        android:layout_width="379dp"
-        android:layout_height="0dp"
-        android:layout_marginTop="44dp"
-        android:text="Easy ESP"
-        android:textAlignment="center"
-        android:textAllCaps="false"
-        android:textColor="@color/black"
-        android:textSize="34sp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
-
-    <EditText
-        android:id="@+id/ssidText1"
-        android:layout_width="wrap_content"
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/ssidInputLayout"
+        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:layout_marginStart="32dp"
         android:layout_marginTop="16dp"
-        android:ems="10"
-        android:inputType="text"
-        android:text="SSID"
-        android:textAlignment="center"
-        android:textColor="@android:color/darker_gray"
+        android:layout_marginEnd="32dp"
+        android:hint="SSID"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/network_Textview" />
+        app:layout_constraintTop_toBottomOf="@+id/network_Textview">
 
-    <TextView
-        android:id="@+id/network_Textview"
-        android:layout_width="162dp"
-        android:layout_height="29dp"
-        android:layout_marginTop="8dp"
-        android:text="Network Details"
-        android:textAlignment="center"
-        android:textAllCaps="false"
-        android:textAppearance="@style/TextAppearance.AppCompat.Large"
-        android:textColor="@color/black"
-        android:textSize="20sp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/data_received_text" />
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/ssidText1"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="text" />
+    </com.google.android.material.textfield.TextInputLayout>
 
-    <EditText
-        android:id="@+id/passText2"
-        android:layout_width="wrap_content"
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/passInputLayout"
+        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:layout_marginStart="32dp"
         android:layout_marginTop="8dp"
-        android:ems="10"
-        android:inputType="text"
-        android:text="Password"
-        android:textAlignment="center"
-        android:textColor="@android:color/darker_gray"
+        android:layout_marginEnd="32dp"
+        android:hint="Password"
+        app:endIconMode="password_toggle"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/ssidText1" />
+        app:layout_constraintTop_toBottomOf="@+id/ssidInputLayout">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/passText2"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="textPassword" />
+    </com.google.android.material.textfield.TextInputLayout>
 
     <Button
         android:id="@+id/connectButton"
-        android:layout_width="wrap_content"
+        style="@style/Widget.Material3.Button"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:background="@color/purple_500"
+        android:layout_marginStart="32dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginEnd="32dp"
         android:text="Provision WiFi Connection"
-        android:textAlignment="center"
-        android:textColor="@color/white"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/passText2" />
+        app:layout_constraintTop_toBottomOf="@+id/passInputLayout" />
+
+    <TextView
+        android:id="@+id/serialMonitorTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="24dp"
+        android:text="Serial Monitor"
+        android:textColor="@color/black"
+        android:textAppearance="?attr/textAppearanceTitleSmall"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/connectButton" />
 
     <ScrollView
         android:id="@+id/serialMonitorScrollView"
-        android:layout_width="256dp"
-        android:layout_height="164dp"
-        android:background="@color/black"
-        android:scrollbarStyle="outsideInset"
-        android:visibility="visible"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="16dp"
+        android:background="#1C1B1F"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.503"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/connectButton"
-        app:layout_constraintVertical_bias="0.159"
-        tools:visibility="visible">
+        app:layout_constraintTop_toBottomOf="@+id/serialMonitorTitle">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:padding="8dp">
 
             <TextView
                 android:id="@+id/serialMonitorTextView"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:paddingLeft="8dp"
-                android:paddingTop="8dp"
-                android:paddingRight="8dp"
-                android:paddingBottom="8dp"
-                android:text="Serial Monitor"
-                android:textAlignment="textStart"
-                android:textColor="@color/white" />
+                android:fontFamily="monospace"
+                android:textColor="@color/white"
+                android:textSize="12sp"
+                tools:text="Logs will appear here..." />
         </LinearLayout>
-
-
     </ScrollView>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

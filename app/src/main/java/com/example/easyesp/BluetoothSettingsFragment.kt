@@ -22,7 +22,7 @@ class BluetoothSettingsFragment : Fragment() {
         const val PREFS_NAME = "BluetoothSettingsPrefs"
         const val KEY_DEVICE_NAME = "device_name"
         const val KEY_DISCOVERY_ENABLED = "discovery_enabled"
-        const val DEFAULT_DEVICE_NAME = "MyESP32"
+        const val DEFAULT_DEVICE_NAME = "EasyESPDevice"
     }
 
     override fun onCreateView(
@@ -65,26 +65,24 @@ class BluetoothSettingsFragment : Fragment() {
         deviceNameEditText.setOnFocusChangeListener { _, hasFocus ->
             if (!hasFocus) {
                 saveDeviceName()
-            }
-            discoverDevicesSwitch.setOnCheckedChangeListener { _, isChecked ->
-                // First, save the state as before
-                saveDiscoveryState(isChecked)
-
-                // Now, create an explicit Intent to command the service.
-                val intent = Intent(requireContext(), BluetoothLeService::class.java).apply {
-                    // Set the action for the service to perform.
-                    action = BluetoothLeService.ACTION_MANAGE_SCAN_STATE
-                }
-                // Start the service with this command. If the service is running,
-                // it will receive this in onStartCommand.
-                requireContext().startService(intent)
+                // If name changed, we should trigger a scan refresh
+                triggerScanRefresh()
             }
         }
 
         // Save the switch state whenever the user toggles it
         discoverDevicesSwitch.setOnCheckedChangeListener { _, isChecked ->
             saveDiscoveryState(isChecked)
+            triggerScanRefresh()
         }
+    }
+
+    private fun triggerScanRefresh() {
+        // Create an explicit Intent to command the service.
+        val intent = Intent(requireContext(), BluetoothLeService::class.java).apply {
+            action = BluetoothLeService.ACTION_MANAGE_SCAN_STATE
+        }
+        requireContext().startService(intent)
     }
 
     private fun saveDeviceName() {

@@ -1,5 +1,3 @@
-// --- FINAL IOT SKETCH - WIFI & TCP SERVER (Corrected) ---
-
 #include <Arduino.h>
 #include <BLEDevice.h>
 #include <BLEServer.h>
@@ -7,222 +5,248 @@
 #include <BLE2902.h>
 #include <WiFi.h>
 #include <ESPmDNS.h>
-#include "user_actions.h" //This is where you will build your own custom user actions
+#include <Preferences.h>
 
-// --- WiFi & Network Server ---
-WiFiServer tcpServer(8888);
-WiFiClient client;
+// Include custom actions
+#include "user_actions.h" 
 
-// --- Bluetooth (for initial provisioning) ---
-BLEServer* pServer = NULL;
-bool deviceConnected = false;
-char wifi_ssid[64] = {0};
-char wifi_pass[64] = {0};
-volatile bool shouldConnectToWifi = false;
-
-// STATE FLAGS FOR ROBUSTNESS 
-bool isProvisioned = false;      // Tracks if successfully connected to WiFi
-bool is_advertising = false;     // Manually track advertising state
-
+// --- Configuration ---
 #define SERVICE_UUID           "1fc8d4ca-3b3d-42e3-bdf0-1ff2edcf8268"
 #define CHARACTERISTIC_UUID_RX "586eb1c5-597a-4c5a-bfcf-655d4909b7a1"
-#define CHARACTERISTIC_UUID_TX "586eb1c5-597a-4c5a-bfcf-655d4909b7a2" // ESP -> Phone
+#define CHARACTERISTIC_UUID_TX "586eb1c5-597a-4c5a-bfcf-655d4909b7a2"
+#define TCP_PORT               8888
+#define DEVICE_NAME            "EasyESPDevice"
 
-BLECharacteristic* pTxCharacteristic = NULL; // Global pointer
+// --- Global Objects ---
+WiFiServer tcpServer(TCP_PORT);
+WiFiClient client;
+Preferences preferences;
+BLECharacteristic* pTxChar = NULL;
+
+// --- State Management ---
+enum DeviceState { IDLE, PROVISIONING, CONNECTING, OPERATIONAL };
+DeviceState currentState = IDLE;
+
+bool bleConnected = false;
+unsigned long stateStartTime = 0;
+const unsigned long WIFI_TIMEOUT_MS = 20000; // 20 seconds to try connecting
+
+// --- Forward Declarations ---
+void startBLE();
+void stopBLE();
+void handleTcpServer();
 
 // --- BLE Callbacks ---
 class MyServerCallbacks: public BLEServerCallbacks {
-    void onConnect(BLEServer* pServer) {
-        deviceConnected = true;
-        is_advertising = false; // We are connected, so we are not advertising
-        Serial.println(">>> Device connected");
+    void onConnect(BLEServer* pServer) { 
+        bleConnected = true; 
+        Serial.println("System: BLE Connected"); 
     }
-    void onDisconnect(BLEServer* pServer) {
-        deviceConnected = false;
-        Serial.println("<<< Device disconnected");
-    }
-};
-
-class MyCallbacks: public BLECharacteristicCallbacks {
-    void onWrite(BLECharacteristic *pCharacteristic) {
-        String rxValue = pCharacteristic->getValue();
-
-        if (rxValue.length() > 0 && rxValue.length() < 128) {
-            Serial.print(">>> Received Value: ");
-            Serial.println(rxValue);
-
-            if (rxValue.startsWith("WIFI:")) {
-                char temp_buffer[128];
-                rxValue.toCharArray(temp_buffer, sizeof(temp_buffer));
-                temp_buffer[sizeof(temp_buffer) - 1] = '\0';
-
-                char* ssid_ptr = strtok(temp_buffer + 5, ",");
-                if (ssid_ptr != NULL) {
-                    strncpy(wifi_ssid, ssid_ptr, sizeof(wifi_ssid) - 1);
-                    wifi_ssid[sizeof(wifi_ssid) - 1] = '\0';
-
-                    char* pass_ptr = strtok(NULL, ",");
-                    if (pass_ptr != NULL) {
-                        strncpy(wifi_pass, pass_ptr, sizeof(wifi_pass) - 1);
-                        wifi_pass[sizeof(wifi_pass) - 1] = '\0';
-                    } else {
-                        memset(wifi_pass, 0, sizeof(wifi_pass));
-                    }
-
-                    shouldConnectToWifi = true;
-                }
-            }
+    void onDisconnect(BLEServer* pServer) { 
+        bleConnected = false; 
+        Serial.println("System: BLE Disconnected"); 
+        // If disconnected during provisioning, restart advertising
+        if (currentState == PROVISIONING) {
+            delay(500);
+            BLEDevice::startAdvertising();
         }
     }
 };
 
-void start_advertising() {
-    BLEDevice::getAdvertising()->start();
-    is_advertising = true;
-    Serial.println(">>> BLE Provisioning Service Started. Advertising.");
-}
+class ProvisioningCallbacks: public BLECharacteristicCallbacks {
+    void onWrite(BLECharacteristic *pChar) {
+        String rx = pChar->getValue().c_str(); // Safely get string
+        
+        if (rx.startsWith("WIFI:")) {
+            int commaIndex = rx.indexOf(',', 5);
+            if (commaIndex != -1) {
+                String ssid = rx.substring(5, commaIndex);
+                String pass = rx.substring(commaIndex + 1);
 
-void stop_advertising() {
-    BLEDevice::getAdvertising()->stop();
-    is_advertising = false;
-    Serial.println("<<< BLE Advertising Stopped.");
-}
+                Serial.printf("System: Received Credentials for %s\n", ssid.c_str());
+
+                // Save to non-volatile storage
+                preferences.begin("wifi", false);
+                preferences.putString("ssid", ssid);
+                preferences.putString("pass", pass);
+                preferences.end();
+
+                // Send success back to the Android App
+                if (pTxChar) { 
+                    pTxChar->setValue("STATUS:OK"); 
+                    pTxChar->notify(); 
+                }
+                
+                // Allow time for the BLE packet to send before restarting
+                delay(1000); 
+                Serial.println("System: Credentials saved. Restarting to apply...");
+                ESP.restart(); // A clean reboot is best practice for initializing WiFi
+            } else {
+                 if (pTxChar) { pTxChar->setValue("STATUS:FAIL"); pTxChar->notify(); }
+            }
+        }
+    }
+};
 
 void setup() {
     Serial.begin(115200);
     delay(1000);
-    Serial.println("\n--- ESP32 IoT Device Booting ---");
+    Serial.println("\n--- EasyESP Framework Booting ---");
 
-    user_setup(); //call user setup
-    //Setup LEDC Channel
-    //ledcSetup(LEDC_CHANNEL_0, LEDC_BASE_FREQ, LEDC_TIMER_8_BIT);
-    //Serial.println("LEDC Channel 0 configured.");
+    user_setup(); // Initialize user's custom hardware
 
-    // Start BLE for provisioning
-    BLEDevice::init("MyESP32");
-    pServer = BLEDevice::createServer();
-    pServer->setCallbacks(new MyServerCallbacks());
-    BLEService *pService = pServer->createService(SERVICE_UUID);
-    BLECharacteristic* pRxCharacteristic = pService->createCharacteristic(CHARACTERISTIC_UUID_RX, BLECharacteristic::PROPERTY_WRITE);
-    pRxCharacteristic->setCallbacks(new MyCallbacks());
-    pTxCharacteristic = pService->createCharacteristic(
-        CHARACTERISTIC_UUID_TX,
-        BLECharacteristic::PROPERTY_NOTIFY // Use NOTIFY to send updates to the phone
-    );
-    pTxCharacteristic->addDescriptor(new BLE2902()); // Standard descriptor for notifications   
-    pService->start();
-    start_advertising(); // Use new helper function
+    // Check for saved credentials
+    preferences.begin("wifi", true);
+    String ssid = preferences.getString("ssid", "");
+    String pass = preferences.getString("pass", "");
+    preferences.end();
+
+    if (ssid != "") {
+        currentState = CONNECTING;
+        stateStartTime = millis();
+        WiFi.begin(ssid.c_str(), pass.c_str());
+        Serial.printf("System: Connecting to saved network: %s...\n", ssid.c_str());
+    } else {
+        currentState = PROVISIONING;
+        startBLE();
+    }
 }
 
 void loop() {
-    // --- STATE 1: PROVISIONING ATTEMPT ---
-    // If a BLE client has sent WiFi credentials, this is highest priority.
-    if (shouldConnectToWifi) {
-        shouldConnectToWifi = false; // acknowledged the request.
-        //disconnect previous session
-        Serial.println("Framework: Disconnecting previous WiFi configuration before new attempt.");
-        WiFi.disconnect(true);
-        delay(100); // Give it a brief moment to tear down the connection.
-        //attempt reconnect
-        Serial.print("Connecting to "); Serial.println(wifi_ssid);
-        WiFi.begin(wifi_ssid, wifi_pass);
-        int attempts = 0;
-        while (WiFi.status() != WL_CONNECTED && attempts < 20) {
-            delay(500); Serial.print("."); attempts++;
-        }
-
-        if (WiFi.status() == WL_CONNECTED) {
-            // SUCCESS
-            Serial.println("\nSUCCESS: WiFi Connected!");
-            isProvisioned = true;
-
-            // Send success message to the phone over BLE
-            if (deviceConnected && pTxCharacteristic != NULL) {
-                pTxCharacteristic->setValue("STATUS:OK");
-                pTxCharacteristic->notify();
-                Serial.println(">>> Sent 'STATUS:OK' to phone.");
-            }
-
-            // shut down BLE and start the network services
-            delay(100); // give a moment for the BLE notification to send
-            stop_advertising();
-            if (deviceConnected) { pServer->disconnect(pServer->getConnId()); }
-
-            if (MDNS.begin("easyesp-device")) {
-                Serial.println("mDNS responder started. Hostname: easyesp-device.local");
-                MDNS.addService("easyesp", "tcp", 8888);
-            }
-            tcpServer.begin();
-            Serial.println("TCP Server started on port 8888. Ready for app connection.");
-
-        } else {
-            // FAILURE
-            Serial.println("\nFAILURE: Could not connect to WiFi.");
-            // Send failure message back to the phone over BLE
-            if (deviceConnected && pTxCharacteristic != NULL) {
-                pTxCharacteristic->setValue("STATUS:FAIL");
-                pTxCharacteristic->notify();
-                Serial.println(">>> Sent 'STATUS:FAIL' to phone.");
-            }
-            // On failure, do nothing else. The phone is still connected via BLE
-            // and the auto-advertising logic below will take over if it disconnects.
-        }
-    }
-
-    // --- STATE 2: NORMAL OPERATION (TCP COMMANDS) ---
-    // If already connected to WiFi, only job is to handle the TCP client.
-    else if (WiFi.status() == WL_CONNECTED) {
-        if (!client.connected()) {
-            client = tcpServer.available();
-            if (client) Serial.println("Framework: App has connected via WiFi/TCP!");
-        } else {
-            if (client.available()) {
-                String line = client.readStringUntil('\n');
-                line.trim();
-                Serial.print("Framework: Received Command: "); Serial.println(line);
-
-                // --- MODIFIED COMMAND PARSER ---
-                char cmd_buffer[50];
-                line.toCharArray(cmd_buffer, 50);
-                char* type = strtok(cmd_buffer, ",");
+    switch (currentState) {
+        case CONNECTING:
+            if (WiFi.status() == WL_CONNECTED) {
+                Serial.println("\nSystem: WiFi Connected Successfully!");
                 
-                if (type != NULL) {
-                    if (strcmp(type, "B") == 0 || strcmp(type, "S") == 0 || strcmp(type, "V") == 0) {
-                        char* pin_str = strtok(NULL, ",");
-                        char* val_str = strtok(NULL, ",");
-                        
-                        if (pin_str != NULL && val_str != NULL) {
-                            int pin = atoi(pin_str);
-                            int value = atoi(val_str);
-                            
-                            // Let the framework acknowledge the command
-                            Serial.printf("Framework: Parsed as Type=%s, Pin=%d, Value=%d\n", type, pin, value);
-                            client.printf("ACK:%s,%d,%d\n", type, pin, value);
+                // Start mDNS and TCP services
+                if (MDNS.begin("easyesp-device")) {
+                    MDNS.addService("easyesp", "tcp", TCP_PORT);
+                }
+                tcpServer.begin();
 
-                            // CALL THE USER'S HANDLER FUNCTION. THIS IS THE HEART OF SANDBOX.
-                            handle_user_action(type, pin, value);
-                        }
-                    } else {
-                        // This is not a standard B, S, or V command.
-                        // It must be a custom INTERACTION command.
-                        client.print("ACK: " + line + "\n");
+                // MEMORY OPTIMIZATION: Completely shut down BLE to free up ~50KB of RAM
+                BLEDevice::deinit(true); 
+                Serial.println("System: BLE De-initialized to free RAM.");
+
+                currentState = OPERATIONAL;
+            } 
+            else if (millis() - stateStartTime > WIFI_TIMEOUT_MS) {
+                Serial.println("\nSystem: WiFi Connection timeout.");
+                WiFi.disconnect();
+                
+                // Clear bad credentials so it does not get stuck in a boot loop
+                preferences.begin("wifi", false);
+                preferences.clear();
+                preferences.end();
+                
+                Serial.println("System: Starting BLE Provisioning...");
+                currentState = PROVISIONING;
+                startBLE();
+            }
+            break;
+
+        case OPERATIONAL:
+            // Check for dropped connections
+            if (WiFi.status() != WL_CONNECTED) {
+                Serial.println("System: WiFi Connection Lost! Reconnecting...");
+                WiFi.disconnect();
+                WiFi.reconnect();
+                currentState = CONNECTING;
+                stateStartTime = millis();
+                break;
+            }
+            
+            // Handle incoming App commands
+            handleTcpServer();
+            break;
+
+        case PROVISIONING:
+            // The BLE Server handles this automatically in the background via callbacks
+            break;
+
+        case IDLE:
+            break;
+    }
+}
+
+void startBLE() {
+    BLEDevice::init(DEVICE_NAME);
+    BLEServer* pServer = BLEDevice::createServer();
+    pServer->setCallbacks(new MyServerCallbacks());
+    BLEService* pService = pServer->createService(SERVICE_UUID);
+
+    BLECharacteristic* pRx = pService->createCharacteristic(
+        CHARACTERISTIC_UUID_RX, 
+        BLECharacteristic::PROPERTY_WRITE
+    );
+    pRx->setCallbacks(new ProvisioningCallbacks());
+
+    pTxChar = pService->createCharacteristic(
+        CHARACTERISTIC_UUID_TX, 
+        BLECharacteristic::PROPERTY_NOTIFY
+    );
+    pTxChar->addDescriptor(new BLE2902());
+
+    pService->start();
+
+    // --- IMPROVED ADVERTISING ---
+    BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
+    pAdvertising->addServiceUUID(SERVICE_UUID);
+    pAdvertising->setScanResponse(true);
+    
+    // These two lines help with Android discovery and connection stability
+    pAdvertising->setMinPreferred(0x06);  
+    pAdvertising->setMinPreferred(0x12);
+    
+    BLEDevice::startAdvertising();
+    Serial.println("System: BLE Advertising active. Ready for App.");
+}
+
+void handleTcpServer() {
+    if (!client.connected()) {
+        client = tcpServer.available();
+    } else {
+        if (client.available()) {
+            String line = client.readStringUntil('\n');
+            line.trim();
+
+            // Intercept Heartbeat from App
+            if (line == "HEARTBEAT") {
+                client.println("HEARTBEAT_ACK");
+                return;
+            }
+
+            Serial.print("App Command: "); Serial.println(line);
+
+            // MEMORY OPTIMIZATION: We use char arrays and strtok for standard commands
+            // This prevents heap fragmentation that occurs when doing heavy String manipulation
+            char cmd_buffer[128];
+            line.toCharArray(cmd_buffer, sizeof(cmd_buffer));
+            
+            char* type = strtok(cmd_buffer, ",");
+            
+            if (type != NULL) {
+                // If it is a standard Sandbox UI control (Button, Switch, Value/Slider)
+                if (strcmp(type, "B") == 0 || strcmp(type, "S") == 0 || strcmp(type, "V") == 0) {
+                    char* pin_str = strtok(NULL, ",");
+                    char* val_str = strtok(NULL, ",");
+                    
+                    if (pin_str != NULL && val_str != NULL) {
+                        int pin = atoi(pin_str);
+                        int value = atoi(val_str);
                         
-                        // CALL THE USER'S INTERACTION HANDLER
-                        handle_interaction_command(line);
+                        // Acknowledge receipt
+                        client.printf("ACK:%s,%d,%d\n", type, pin, value);
+                        
+                        // Pass to user logic
+                        handle_user_action(type, pin, value);
                     }
+                } else {
+                    // It is a custom interaction command (like "PING:google.com")
+                    client.printf("ACK:%s\n", line.c_str());
+                    handle_interaction_command(line);
                 }
             }
-        }
-    }
-
-    // --- STATE 3: RECOVERY / IDLE ADVERTISING ---
-    // This runs if we are not trying to connect to WiFi and are not yet on WiFi.
-    // Its job is to make sure we are discoverable via BLE if we need to be.
-    else {
-        if (!isProvisioned && !deviceConnected && !is_advertising) {
-            Serial.println(">>> Idle state. Restarting BLE advertising for provisioning...");
-            delay(500); // Give a moment before restarting
-            start_advertising();
         }
     }
 }

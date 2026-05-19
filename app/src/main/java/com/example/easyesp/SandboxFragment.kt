@@ -6,28 +6,31 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.AdapterView
-import android.widget.ArrayAdapter
-import android.widget.Button
-import android.widget.EditText
-import android.widget.ScrollView
-import android.widget.Spinner
-import android.widget.TextView
-import android.widget.Toast
+import android.widget.*
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
-//import androidx.glance.visibility
-import androidx.lifecycle.Observer
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
+import com.example.easyesp.databinding.FragmentSandboxBinding
 import com.google.android.material.textfield.TextInputLayout
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import java.io.ObjectInputStream
 import java.io.ObjectOutputStream
 
+/**
+ * SandboxFragment allows users to create custom controls and interact with their ESP32.
+ * Migrated to ViewBinding and StateFlow.
+ */
 class SandboxFragment : Fragment() {
 
     private val TAG = "SandboxFragment"
+
+    private var _binding: FragmentSandboxBinding? = null
+    private val binding get() = _binding!!
 
     // --- ViewModel & Data ---
     private val connectionViewModel: ConnectionViewModel by activityViewModels()
@@ -35,79 +38,68 @@ class SandboxFragment : Fragment() {
     private val controlsList = mutableListOf<SandboxControl>()
     private val FILENAME = "sandbox_controls.dat"
 
-    // --- UI Elements ---
-    private lateinit var recyclerView: RecyclerView
-    private lateinit var addControlButton: Button
-    private lateinit var monitorTextView: TextView
-    private lateinit var monitorScrollView: ScrollView
-
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
-    ): View? {
-        // Inflate the layout for this fragment
-        return inflater.inflate(R.layout.fragment_sandbox, container, false)
+    ): View {
+        _binding = FragmentSandboxBinding.inflate(inflater, container, false)
+        return binding.root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // --- UI Initialization ---
-        addControlButton = view.findViewById(R.id.button_add_control)
-        recyclerView = view.findViewById(R.id.recycler_view_controls)
-        monitorTextView = view.findViewById(R.id.monitor_textView)
-        monitorScrollView = view.findViewById(R.id.monitor_scrollview)
-
         // --- Setup ---
         setupRecyclerView()
-        loadControls() // Load saved controls from device storage
+        loadControls()
 
-        addControlButton.setOnClickListener {
+        binding.buttonAddControl.setOnClickListener {
             showAddControlDialog()
         }
 
-        // --- Observers ---
-        // Observe the main serial log from the ViewModel and append it here
-        connectionViewModel.serialLog.observe(viewLifecycleOwner, Observer { log ->
-            monitorTextView.text = log
-            // Scroll to the bottom whenever new text is added
-            monitorScrollView.post { monitorScrollView.fullScroll(View.FOCUS_DOWN) }
-        })
-        // This observer listens for ACKs from our controls.
-        connectionViewModel.latestTcpMessage.observe(viewLifecycleOwner, Observer { message ->
-            // We can add a check if we want to be specific, e.g., if(message.startsWith("ACK:"))
-            if (message != null) {
-                // Check if the message is a custom log from the ESP32
-                if (message.startsWith("LOG:")) {
-                    // It's a log message
-                    val logMessage = message.substringAfter("LOG:").trim()
-                    // Prepend with "ESP32:" to show it came FROM the device
-                    appendToSandboxMonitor("ESP32: $logMessage")
+        // --- Observers & StateFlow Collection ---
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch {
+                    connectionViewModel.serialLog.collectLatest { log ->
+                        binding.monitorTextView.text = log
+                        binding.monitorScrollview.post { 
+                            binding.monitorScrollview.fullScroll(View.FOCUS_DOWN) 
+                        }
+                    }
+                }
 
-                } else if (message.startsWith("ACK:")) {
-                    // It's a standard acknowledgement
-                    val ackMessage = message.substringAfter("ACK:").trim()
-                    appendToSandboxMonitor("ACK from ESP32: $ackMessage")
-
-                } else {
-                    // For any other message that doesn't fit a known format
-                    appendToSandboxMonitor("ESP32 (RAW): $message")
+                launch {
+                    connectionViewModel.tcpMessageEvent.collect { message ->
+                        processIncomingMessage(message)
+                    }
                 }
             }
-        })
+        }
+    }
+
+    private fun processIncomingMessage(message: String) {
+        when {
+            message.startsWith("LOG:") -> {
+                val logMessage = message.substringAfter("LOG:").trim()
+                appendToSandboxMonitor("ESP32: $logMessage")
+            }
+            message.startsWith("ACK:") -> {
+                val ackMessage = message.substringAfter("ACK:").trim()
+                appendToSandboxMonitor("ACK from ESP32: $ackMessage")
+            }
+            else -> {
+                appendToSandboxMonitor("ESP32 (RAW): $message")
+            }
+        }
     }
 
     private fun setupRecyclerView() {
-        // The adapter is initialized with an interaction listener.
-        // When a control is used in the adapter, it calls this lambda function.
         controlsAdapter = SandboxControlsAdapter(
             controlsList,
-            // The first lambda for sending commands (unchanged)
-            { control, command ->
-                Log.d("DEBUG_TRACE", "[1] SandboxFragment: Interaction received. Command: '$command'")
+            { _, command ->
                 Log.d(TAG, "Interaction callback: Sending command '$command'")
-                if (connectionViewModel.isTcpConnected.value == true) {
-                    //ADD TO LOCAL MONITOR
+                if (connectionViewModel.isTcpConnected.value) {
                     appendToSandboxMonitor("App -> ESP32: $command")
                     connectionViewModel.sendTcpCommand(command)
                 } else {
@@ -118,15 +110,13 @@ class SandboxFragment : Fragment() {
                 showDeleteConfirmationDialog(controlToDelete)
             }
         )
-        recyclerView.adapter = controlsAdapter
-        recyclerView.layoutManager = LinearLayoutManager(requireContext())
+        binding.recyclerViewControls.adapter = controlsAdapter
+        binding.recyclerViewControls.layoutManager = LinearLayoutManager(requireContext())
     }
 
     private fun appendToSandboxMonitor(message: String) {
-        // Append to the existing text in the TextView
-        monitorTextView.append("\n$message")
-        // Ensure it scrolls down
-        monitorScrollView.post { monitorScrollView.fullScroll(View.FOCUS_DOWN) }
+        binding.monitorTextView.append("\n$message")
+        binding.monitorScrollview.post { binding.monitorScrollview.fullScroll(View.FOCUS_DOWN) }
     }
 
     private fun showDeleteConfirmationDialog(control: SandboxControl) {
@@ -147,26 +137,20 @@ class SandboxFragment : Fragment() {
     private fun showAddControlDialog() {
         val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_add_control, null)
 
-        // --- Get references to all UI elements ---
         val nameInput: EditText = dialogView.findViewById(R.id.dialog_control_name)
         val typeSpinner: Spinner = dialogView.findViewById(R.id.dialog_control_type_spinner)
-
         val pinInput: EditText = dialogView.findViewById(R.id.dialog_control_pin)
-        // *** FIX 1: Correctly get the parent layout for the pin input ***
         val pinLayout = pinInput.parent.parent as TextInputLayout
-
         val valueLayout: TextInputLayout = dialogView.findViewById(R.id.dialog_value_layout)
         val valueInput: EditText = dialogView.findViewById(R.id.dialog_control_value)
-
         val commandLayout: TextInputLayout = dialogView.findViewById(R.id.dialog_command_layout)
         val commandInput: EditText = dialogView.findViewById(R.id.dialog_control_command)
 
-        // Setup the dropdown (Spinner)
-        val controlTypes = ControlType.values().map { it.name }
-        val spinnerAdapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item, controlTypes)
+        val controlTypes = ControlType.entries.map { it.name }
+        val spinnerAdapter = ArrayAdapter(requireContext(), R.layout.spinner_item, controlTypes)
+        spinnerAdapter.setDropDownViewResource(R.layout.spinner_dropdown_item)
         typeSpinner.adapter = spinnerAdapter
 
-        // --- Corrected logic for showing/hiding fields ---
         typeSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
                 when (ControlType.valueOf(controlTypes[position])) {
@@ -197,11 +181,8 @@ class SandboxFragment : Fragment() {
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
 
-        // Build and show the dialog
-        AlertDialog.Builder(requireContext())
+        AlertDialog.Builder(requireContext(), R.style.Theme_EasyESP_Dialog)
             .setView(dialogView)
-            // Set Title on the builder itself, not in the XML layout
-            .setTitle("Add New Control")
             .setPositiveButton("Add") { dialog, _ ->
                 val name = nameInput.text.toString()
                 val type = ControlType.valueOf(typeSpinner.selectedItem.toString())
@@ -224,7 +205,6 @@ class SandboxFragment : Fragment() {
                                 ControlType.SWITCH -> 0
                                 else -> 0
                             }
-                            // Create control with pin and value
                             SandboxControl(name = name, type = type, pin = pin, value = value)
                         }
                     }
@@ -234,7 +214,6 @@ class SandboxFragment : Fragment() {
                             Toast.makeText(requireContext(), "Command cannot be empty for Interaction.", Toast.LENGTH_SHORT).show()
                             null
                         } else {
-                            // Create control with a command, pin and value will be null by default
                             SandboxControl(name = name, type = type, command = command)
                         }
                     }
@@ -254,12 +233,11 @@ class SandboxFragment : Fragment() {
             .show()
     }
 
-    // --- Data Persistence ---
     private fun saveControls() {
         try {
             val fos = requireContext().openFileOutput(FILENAME, Context.MODE_PRIVATE)
             val oos = ObjectOutputStream(fos)
-            oos.writeObject(ArrayList(controlsList)) // Write a copy
+            oos.writeObject(ArrayList(controlsList))
             oos.close()
             Log.i(TAG, "Successfully saved ${controlsList.size} controls.")
         } catch (e: Exception) {
@@ -276,11 +254,16 @@ class SandboxFragment : Fragment() {
                 controlsList.clear()
                 controlsList.addAll(loadedList)
                 ois.close()
-                controlsAdapter.updateControls(controlsList) // Update the UI
+                controlsAdapter.updateControls(controlsList)
                 Log.i(TAG, "Successfully loaded ${controlsList.size} controls.")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to load controls", e)
         }
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
     }
 }

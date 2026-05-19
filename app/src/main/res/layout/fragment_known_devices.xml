@@ -4,14 +4,12 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/white"
     tools:context=".KnownDevicesFragment">
 
-    <!-- This RecyclerView has the ID the fragment is looking for -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recycler_view_known_devices"
-        android:layout_width="377dp"
-        android:layout_height="694dp"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
         android:clipToPadding="false"
         android:padding="8dp"
         app:layout_constraintBottom_toBottomOf="parent"
@@ -20,15 +18,12 @@
         app:layout_constraintTop_toTopOf="parent"
         tools:listitem="@layout/item_known_device" />
 
-    <!-- This FAB has the ID the fragment is looking for -->
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/fab_add_known_device"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_margin="16dp"
-        android:clickable="true"
-        android:contentDescription="Add New Device Manually"
-        android:focusable="true"
+        android:contentDescription="Add New Device"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:srcCompat="@android:drawable/ic_input_add" />

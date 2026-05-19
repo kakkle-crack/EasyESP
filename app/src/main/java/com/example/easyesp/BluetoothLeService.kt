@@ -1,8 +1,6 @@
 package com.example.easyesp
 
 import android.Manifest
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.app.Service
 import android.bluetooth.*
 import android.bluetooth.le.ScanCallback
@@ -11,26 +9,23 @@ import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.os.Binder
-import android.os.Build
-import android.os.IBinder
-import android.os.Looper
-import android.os.Handler
-import android.os.ParcelUuid
+import android.os.*
 import android.util.Log
-import androidx.core.app.NotificationCompat
+import android.os.ParcelUuid
 import androidx.core.content.ContextCompat
-import java.util.UUID
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
-import androidx.core.app.NotificationManagerCompat
+import java.util.UUID
 
+/**
+ * BluetoothLeService manages the BLE connection and communication with the ESP32.
+ * Optimized for battery life and better code structure.
+ */
 class BluetoothLeService : Service() {
 
     private val bluetoothManager: BluetoothManager by lazy { getSystemService(BluetoothManager::class.java) }
     private val bluetoothAdapter: BluetoothAdapter by lazy { bluetoothManager.adapter }
     private val bleScanner by lazy { bluetoothAdapter.bluetoothLeScanner }
     private var isScanning = false
-    private val scanSettings = ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build()
     private var bluetoothGatt: BluetoothGatt? = null
 
     private val handler = Handler(Looper.getMainLooper())
@@ -38,23 +33,17 @@ class BluetoothLeService : Service() {
 
     companion object {
         private const val TAG = "BluetoothLeService"
-        private const val FOREGROUND_CHANNEL_ID = "ESP32_Service_Channel"
-        private const val EVENTS_CHANNEL_ID = "ESP32_Events_Channel"
-        private const val FOREGROUND_NOTIFICATION_ID = 1
-
-        const val ACTION_GATT_CONNECTED = "com.example.easyesp.ACTION_GATT_CONNECTED"
-        const val ACTION_GATT_DISCONNECTED = "com.example.easyesp.ACTION_GATT_DISCONNECTED"
-        const val ACTION_GATT_SERVICES_DISCOVERED = "com.example.easyesp.ACTION_GATT_SERVICES_DISCOVERED"
         const val ACTION_DATA_AVAILABLE = "com.example.easyesp.ACTION_DATA_AVAILABLE"
         const val EXTRA_DATA = "com.example.easyesp.EXTRA_DATA"
-
         const val ACTION_MANAGE_SCAN_STATE = "com.example.easyesp.ACTION_MANAGE_SCAN_STATE"
 
         val SERVICE_UUID: UUID = UUID.fromString("1fc8d4ca-3b3d-42e3-bdf0-1ff2edcf8268")
-        // ESP code needs the TX and RX characteristic for provisioning.
         val CHARACTERISTIC_UUID_RX: UUID = UUID.fromString("586eb1c5-597a-4c5a-bfcf-655d4909b7a1")
         val CHARACTERISTIC_UUID_TX: UUID = UUID.fromString("586eb1c5-597a-4c5a-bfcf-655d4909b7a2")
         val CCCD_UUID: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
+
+        private const val SCAN_PERIOD = 10000L
+        private const val SCAN_INTERVAL = 30000L
     }
 
     private val binder = LocalBinder()
@@ -70,136 +59,110 @@ class BluetoothLeService : Service() {
     }
 
     private val gattCallback = object : BluetoothGattCallback() {
-        override fun onConnectionStateChange(gatt: BluetoothGatt?, status: Int, newState: Int) {            val deviceName = if (ContextCompat.checkSelfPermission(this@BluetoothLeService, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
-                gatt?.device?.name ?: "Unknown Device"
-            } else { "Unknown Device" }
-
+        override fun onConnectionStateChange(gatt: BluetoothGatt?, status: Int, newState: Int) {
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 if (newState == BluetoothProfile.STATE_CONNECTED) {
-                    Log.w(TAG, "****** SUCCESSFULLY CONNECTED to ${gatt?.device?.address} ******")
+                    Log.i(TAG, "Connected to GATT server.")
                     bluetoothGatt = gatt
-                    // Don't wait for MTU.
-                    if (ContextCompat.checkSelfPermission(this@BluetoothLeService, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
+                    if (hasPermission(Manifest.permission.BLUETOOTH_CONNECT)) {
                         bluetoothGatt?.discoverServices()
                     }
                 } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-                    Log.w(TAG, "****** DISCONNECTED from ${gatt?.device?.address} ******")
-                    ViewModelHolder.connectionViewModel?.isBleConnected?.postValue(false)
-                    if (ContextCompat.checkSelfPermission(this@BluetoothLeService, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
-                        bluetoothGatt?.close()
-                    }
-                    bluetoothGatt = null
+                    Log.i(TAG, "Disconnected from GATT server.")
+                    ViewModelHolder.connectionViewModel?.setBleConnected(false)
+                    close()
                     startBleScan()
                 }
             } else {
-                Log.e(TAG, "Connection Error: status=$status, newState=$newState")
+                Log.e(TAG, "GATT connection error: status=$status")
                 disconnect()
             }
         }
 
-
         override fun onServicesDiscovered(gatt: BluetoothGatt?, status: Int) {
             if (status == BluetoothGatt.GATT_SUCCESS) {
-                Log.i(TAG, "Services discovered successfully.")
-                // This is the true "ready" state.
-                ViewModelHolder.connectionViewModel?.isBleConnected?.postValue(true)
+                Log.i(TAG, "Services discovered.")
+                ViewModelHolder.connectionViewModel?.setBleConnected(true)
                 enableNotifications(gatt)
             } else {
-                Log.w(TAG, "Service discovery failed with status: $status")
-                disconnect() // If service discovery fails, Disconnect.
+                Log.w(TAG, "onServicesDiscovered received: $status")
+                disconnect()
             }
         }
+
         override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, value: ByteArray) {
             val data = value.toString(Charsets.UTF_8)
-            Log.i(TAG, "Received notification: $data")
             broadcastUpdate(ACTION_DATA_AVAILABLE, data)
         }
     }
 
     private val leScanCallback: ScanCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
-            super.onScanResult(callbackType, result)
-            // Use BLUETOOTH_SCAN permission for scanning, not CONNECT
-            if (ContextCompat.checkSelfPermission(this@BluetoothLeService, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED) {
-                Log.i(TAG, "Found device: ${result.device.name ?: "Unnamed"} - Address: ${result.device.address}")
-                stopBleScan()
-                //bluetoothGatt = result.device.connectGatt(this@BluetoothLeService, false, gattCallback)
-                connectToDevice(result.device) //needed
-            }
+            Log.i(TAG, "Found compatible device: ${result.device.address} (${result.device.name ?: "Unnamed"})")
+            stopBleScan()
+            connectToDevice(result.device)
         }
         override fun onScanFailed(errorCode: Int) {
-            Log.e(TAG, "BLE Scan Failed with error code: $errorCode")
+            Log.e(TAG, "Scan failed: $errorCode")
             isScanning = false
         }
     }
 
     fun startBleScan() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
-            Log.e(TAG, "Cannot start scan, BLUETOOTH_SCAN permission not granted.")
+        if (!hasPermission(Manifest.permission.BLUETOOTH_SCAN)) {
+            Log.e(TAG, "Cannot start scan: BLUETOOTH_SCAN permission not granted.")
             return
         }
 
-        val sharedPreferences = getSharedPreferences(BluetoothSettingsFragment.PREFS_NAME, Service.MODE_PRIVATE)
+        val sharedPreferences = getSharedPreferences(BluetoothSettingsFragment.PREFS_NAME, MODE_PRIVATE)
         val isDiscoveryEnabled = sharedPreferences.getBoolean(BluetoothSettingsFragment.KEY_DISCOVERY_ENABLED, false)
 
-        // If discovery is disabled, ensure everything is stopped and do not proceed.
-        if (!isDiscoveryEnabled) {
-            Log.i(TAG, "Scan not starting: Device Discovery is disabled in settings.")
-            stopBleScan() // This will stop scanning and cancel any pending runnables.
-            if (bluetoothGatt != null) {
-                disconnect()
-            }
-            return
-        }
-
-        // If already connected, there's no need to scan. Stop the loop.
-        if (bluetoothGatt != null) {
-            Log.i(TAG, "Scan check stopped: Already connected to a device.")
+        if (!isDiscoveryEnabled || bluetoothGatt != null) {
             stopBleScan()
             return
         }
 
-        // If here, discovery is on and device not connected. Perform scan.
         if (!isScanning) {
-            val deviceNameToScanFor = sharedPreferences.getString(BluetoothSettingsFragment.KEY_DEVICE_NAME, BluetoothSettingsFragment.DEFAULT_DEVICE_NAME)
-            Log.i(TAG, "Starting BLE scan for device name: $deviceNameToScanFor")
-            val scanFilter = ScanFilter.Builder().setDeviceName(deviceNameToScanFor).build()
+            // RELAXED FILTERING: Use Service UUID to find any compatible EasyESP device.
+            // This is much more robust than name-based filtering.
+            val scanFilter = ScanFilter.Builder()
+                .setServiceUuid(ParcelUuid(SERVICE_UUID))
+                .build()
+            
+            val scanSettings = ScanSettings.Builder()
+                .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+                .setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
+                .build()
+
+            Log.i(TAG, "Starting BLE scan for Service UUID: $SERVICE_UUID")
             bleScanner.startScan(listOf(scanFilter), scanSettings, leScanCallback)
             isScanning = true
+
+            // Stop scanning after SCAN_PERIOD to save battery
+            handler.postDelayed({ stopBleScan() }, SCAN_PERIOD)
         }
 
-        // Always schedule the next check. This runnable will call startBleScan() again,
-        // which will then decide if it needs to continue or stop.
-        handler.postDelayed(scanRunnable, 15000)
+        // Reschedule next scan check
+        handler.removeCallbacks(scanRunnable)
+        handler.postDelayed(scanRunnable, SCAN_INTERVAL)
     }
 
     private fun stopBleScan() {
-        // This function's only job is to stop everything: the hardware scan AND the scheduled checks.
-        handler.removeCallbacks(scanRunnable)
-
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
-            return
-        }
-
-        if (isScanning) {
+        if (isScanning && hasPermission(Manifest.permission.BLUETOOTH_SCAN)) {
             bleScanner.stopScan(leScanCallback)
             isScanning = false
-            Log.i(TAG, "Hardware BLE scan stopped.")
+            Log.i(TAG, "Scan stopped.")
         }
     }
 
     private fun enableNotifications(gatt: BluetoothGatt?) {
         val service = gatt?.getService(SERVICE_UUID)
-        val txCharacteristic = service?.getCharacteristic(CHARACTERISTIC_UUID_TX)
-        if (txCharacteristic == null) {
-            Log.e(TAG, "TX Characteristic not found.")
-            return
-        }
+        val txChar = service?.getCharacteristic(CHARACTERISTIC_UUID_TX) ?: return
 
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) return
-        gatt.setCharacteristicNotification(txCharacteristic, true)
+        if (!hasPermission(Manifest.permission.BLUETOOTH_CONNECT)) return
+        gatt.setCharacteristicNotification(txChar, true)
 
-        val descriptor = txCharacteristic.getDescriptor(CCCD_UUID)
+        val descriptor = txChar.getDescriptor(CCCD_UUID)
         if (descriptor != null) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 gatt.writeDescriptor(descriptor, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)
@@ -207,70 +170,65 @@ class BluetoothLeService : Service() {
                 descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
                 gatt.writeDescriptor(descriptor)
             }
-            Log.i(TAG, "Enabled notifications for TX characteristic.")
         }
     }
 
     fun connectToDevice(device: BluetoothDevice) {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) { return }
-        Log.i(TAG, "Attempting to connect to device: ${device.address}")
+        if (!hasPermission(Manifest.permission.BLUETOOTH_CONNECT)) return
+        Log.i(TAG, "Connecting to ${device.address}")
         device.connectGatt(this, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
     }
 
     fun disconnect() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) { return }
-        bluetoothGatt?.disconnect()
-        bluetoothGatt?.close()
+        if (hasPermission(Manifest.permission.BLUETOOTH_CONNECT)) {
+            bluetoothGatt?.disconnect()
+        }
+    }
+
+    private fun close() {
+        if (hasPermission(Manifest.permission.BLUETOOTH_CONNECT)) {
+            bluetoothGatt?.close()
+        }
         bluetoothGatt = null
     }
 
     fun writeCharacteristic(data: String) {
-        if (bluetoothGatt == null) {
-            Log.e(TAG, "Cannot write, GATT not connected.")
-            return
-        }
-        val service = bluetoothGatt?.getService(SERVICE_UUID)
-        if (service == null) {
-            Log.e(TAG, "Service UUID not found.")
-            return
-        }
-        val rxCharacteristic = service.getCharacteristic(CHARACTERISTIC_UUID_RX)
-        if (rxCharacteristic == null) {
-            Log.e(TAG, "RX Characteristic not found.")
-            return
-        }
+        val gatt = bluetoothGatt ?: return
+        val service = gatt.getService(SERVICE_UUID) ?: return
+        val rxChar = service.getCharacteristic(CHARACTERISTIC_UUID_RX) ?: return
 
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) { return }
-        val dataBytes = data.toByteArray(Charsets.UTF_8)
-        rxCharacteristic.value = dataBytes
-        rxCharacteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-        bluetoothGatt?.writeCharacteristic(rxCharacteristic)
-        Log.i(TAG, "Wrote to characteristic: $data")
+        if (!hasPermission(Manifest.permission.BLUETOOTH_CONNECT)) return
+        val bytes = data.toByteArray(Charsets.UTF_8)
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            gatt.writeCharacteristic(rxChar, bytes, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT)
+        } else {
+            rxChar.value = bytes
+            rxChar.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+            gatt.writeCharacteristic(rxChar)
+        }
     }
 
-    // --- Utility Functions ---
     private fun broadcastUpdate(action: String, data: String) {
-        val intent = Intent(action)
-        intent.putExtra(EXTRA_DATA, data)
+        val intent = Intent(action).apply { putExtra(EXTRA_DATA, data) }
         LocalBroadcastManager.getInstance(this).sendBroadcast(intent)
     }
 
-    override fun onCreate() {
-        super.onCreate()
-        Log.d(TAG, "BluetoothLeService created.")
+    private fun hasPermission(permission: String): Boolean {
+        return ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
     }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.d(TAG, "BluetoothLeService started.")
         if (intent?.action == ACTION_MANAGE_SCAN_STATE) {
-            Log.i(TAG, "Received command to manage scan state.")
-            // This will re-evaluate the scanning logic based on current settings
             startBleScan()
         }
         return START_NOT_STICKY
     }
+
     override fun onDestroy() {
         super.onDestroy()
+        handler.removeCallbacks(scanRunnable)
         disconnect()
-        Log.d(TAG, "BluetoothLeService destroyed.")
+        close()
     }
 }
